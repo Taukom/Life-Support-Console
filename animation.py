@@ -188,7 +188,6 @@ def clear():
 def meteorite_destruction(score=0, width=120, height=50, fps=8):
     delay = 1.0 / fps
 
-    # ASCII корабль
     ship = [
         "    /^\\    ",
         "   /###\\   ",
@@ -198,11 +197,21 @@ def meteorite_destruction(score=0, width=120, height=50, fps=8):
     ]
     ship_w, ship_h = len(ship[0]), len(ship)
 
+
+    meteorite = [
+        "      ",
+        " @@@@@ ",
+        "@@@@@@  ",
+        " @@@ ",
+        "     ",
+    ]
+    meteor_w, meteor_h = len(meteorite[0]), len(meteorite)
+
     # звёзды
     stars = [(random.randint(0, width-1), random.randint(0, height-1)) for _ in range(400)]
 
-    # === СЦЕНА 1: корабль летит ===
-    frames_flight = int(3 * fps)
+    # === СЦЕНА 1: корабль летит и метеорит появляется ===
+    frames_flight = int(6 * fps)  # подольше
     for f in range(frames_flight):
         canvas = [[" " for _ in range(width)] for _ in range(height)]
 
@@ -219,13 +228,17 @@ def meteorite_destruction(score=0, width=120, height=50, fps=8):
                 if ch != " ":
                     canvas[y0+sy][x0+sx] = ch
 
-        # метеорит начинает появляться справа
-        if f >= frames_flight-6:
-            mx = width - (f - (frames_flight-6))*6
-            my = cy
-            if 0 <= mx < width:
-                canvas[my][mx] = "O"
-                canvas[my+1][mx] = "O"
+        # метеорит появляется справа и летит медленнее
+        if f >= frames_flight//2:
+            mx = width - (f - frames_flight//2) * 2  # скорость меньше
+            my = cy - meteor_h//2
+            if mx < width:
+                for sy, row in enumerate(meteorite):
+                    for sx, ch in enumerate(row):
+                        if ch != " ":
+                            x, y = mx+sx, my+sy
+                            if 0 <= x < width and 0 <= y < height:
+                                canvas[y][x] = ch
 
         clear()
         print("\n".join("".join(r) for r in canvas))
@@ -234,7 +247,7 @@ def meteorite_destruction(score=0, width=120, height=50, fps=8):
     # === СЦЕНА 2: столкновение, осколки ===
     cx, cy = width//2, height//2
     fragments = []
-    for _ in range(60):  # осколки корабля
+    for _ in range(100):  # больше осколков
         angle = random.uniform(0, 2*math.pi)
         speed = random.uniform(0.5, 2.5)
         fragments.append({
@@ -242,7 +255,7 @@ def meteorite_destruction(score=0, width=120, height=50, fps=8):
             "y": cy,
             "dx": math.cos(angle)*speed,
             "dy": math.sin(angle)*speed,
-            "ch": random.choice(["#", "+", "%", "*"])
+            "ch": random.choice(["#", "+", "%", "*", "@"])
         })
 
     frames_fragments = int(5 * fps)
@@ -291,9 +304,6 @@ def meteorite_destruction(score=0, width=120, height=50, fps=8):
 
     print(f"☄️ Метеорит уничтожил корабль! SCORE: {score}")
 
-
-if __name__ == "__main__":
-    meteorite_destruction(score=456, width=120, height=50, fps=8)
 
 
 
@@ -355,3 +365,134 @@ def oxygen_box_scene(score=0, width=120, height=50, fps=8, duration=12):
         time.sleep(delay)
 
     print(f"💀 OXYGEN LOST — FINAL SCORE: {score}")
+
+
+import os, time, random, math, winsound
+
+
+def clear():
+    os.system("cls" if os.name == "nt" else "clear")
+
+
+def play_beep(freq, dur):
+    try:
+        winsound.Beep(freq, dur)
+    except:
+        pass  # если терминал без звука
+
+
+def atomic_city(score=0, width=100, height=35, fps=8, duration=13):
+    delay = 1.0 / fps
+    ground_y = height - 6
+
+    # ==== город ====
+    buildings = []
+    for x in range(0, width, 7):
+        h = random.randint(2, 6)
+        buildings.append((x, ground_y - h))
+
+    # ==== бомба ====
+    bomb = ["  /\\  ",
+            " |@@| ",
+            " |@@| ",
+            "  \\/  ",
+            "  ||  "]
+    bomb_w, bomb_h = len(bomb[0]), len(bomb)
+
+    cx, cy = width // 2, ground_y - 2
+
+    fall_frames = int(3 * fps)
+    explosion_frames = int(6 * fps)
+
+    # ===== 1. Падение =====
+    for f in range(fall_frames):
+        # звук тревоги с повышением тона
+        if f % (fps // 2) == 0:
+            play_beep(800 + f * 30, 100)
+
+        canvas = [[" " for _ in range(width)] for _ in range(height)]
+        for x in range(width):
+            canvas[ground_y][x] = "_"
+        for bx, top_y in buildings:
+            for y in range(top_y, ground_y):
+                for dx in range(6):
+                    if bx + dx < width:
+                        canvas[y][bx + dx] = "#"
+
+        by = int((ground_y // 2) * (f / fall_frames))
+        for sy, row in enumerate(bomb):
+            for sx, ch in enumerate(row):
+                if ch != " " and 0 <= cx + sx - bomb_w // 2 < width and 0 <= by + sy < height:
+                    canvas[by + sy][cx + sx - bomb_w // 2] = ch
+
+        clear()
+        print("\n".join("".join(r) for r in canvas))
+        time.sleep(delay)
+
+    # ===== 2. Взрыв =====
+    # взрывной аккорд: низ + высокий визг
+    play_beep(100, 400)
+    play_beep(150, 300)
+    play_beep(1000, 150)
+
+    fragments = []
+    for _ in range(150):
+        angle = random.uniform(0, 2 * math.pi)
+        speed = random.uniform(0.5, 3.0)
+        fragments.append({
+            "x": cx, "y": cy,
+            "dx": math.cos(angle) * speed,
+            "dy": math.sin(angle) * speed * 0.5,
+            "ch": random.choice(["#", "%", "+", "*"])
+        })
+
+    for f in range(explosion_frames):
+        # звуковое эхо
+        if f < fps * 2 and f % (fps // 2) == 0:
+            play_beep(200 - f * 20, 200)
+
+        canvas = [[" " for _ in range(width)] for _ in range(height)]
+        t = f / explosion_frames
+        stem_h = int(5 + t * 8)
+        cap_r = int(8 + t * 18)
+        cap_h = int(5 + t * 6)
+
+        # ножка гриба
+        for y in range(stem_h):
+            for dx in range(-3, 4):
+                if 0 <= cy - y < height and 0 <= cx + dx < width:
+                    canvas[cy - y][cx + dx] = "|"
+
+        # шапка
+        for dy in range(-cap_h, 0):
+            for dx in range(-cap_r, cap_r + 1):
+                if 0 <= cy - stem_h + dy < height and 0 <= cx + dx < width:
+                    if dx * dx + (dy * 2) ** 2 < cap_r * cap_r:
+                        canvas[cy - stem_h + dy][cx + dx] = random.choice(["@", "%", "#", "*", ".", ":"])
+
+        # обломки
+        for frag in fragments:
+            frag["x"] += frag["dx"]
+            frag["y"] += frag["dy"]
+            frag["dy"] += 0.07
+            if 0 <= int(frag["x"]) < width and 0 <= int(frag["y"]) < height:
+                canvas[int(frag["y"])][int(frag["x"])] = frag["ch"]
+
+        # ударная волна
+        radius = int((f / explosion_frames) * (width // 2))
+        if radius > 2:
+            for angle in range(0, 360, 6):
+                rx = int(cx + math.cos(math.radians(angle)) * radius)
+                ry = int(cy + math.sin(math.radians(angle)) * radius * 0.4)
+                if 0 <= rx < width and 0 <= ry < height:
+                    canvas[ry][rx] = random.choice(["-", ".", "~", " "])
+
+        clear()
+        print("\n".join("".join(r) for r in canvas))
+        time.sleep(delay)
+
+    # ===== 3. ФИНАЛ =====
+    for echo_freq in [150, 120, 90, 60]:
+        play_beep(echo_freq, 200)
+
+    print("\n" * 110 + "☢  NUCLEAR STRIKE  ☢\nSCORE:", score)
